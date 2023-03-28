@@ -3,6 +3,19 @@
 
 try
 {
+    // Check the default argument length for help
+    bool CheckHelpArgLength = args.Length < 1;
+    switch (CheckHelpArgLength)
+    {
+        case true:
+            Console.WriteLine("Warning: Enough arguments not specified");
+            Console.WriteLine("");
+            DEhelp.ShowCommands();
+            break;
+        case false:
+            break;
+    }
+
     // Display Help page according to the argument
     bool CheckIfArgIsHelp = args[0].Contains("-?") || args[0].Contains("-h");
     switch (CheckIfArgIsHelp)
