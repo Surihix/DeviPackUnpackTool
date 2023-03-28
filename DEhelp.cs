@@ -13,7 +13,7 @@
             Console.WriteLine("-? or -h = Show app functions");
             Console.WriteLine("");
             Console.WriteLine("");
-            Console.WriteLine("When using -p function, you will have to specify a compression level argument");
+            Console.WriteLine("When using -p function, you will have to specify a compression level argument switch");
             Console.WriteLine("");
             Console.WriteLine("Valid compression levels:");
             Console.WriteLine("-c0 = No compression");
@@ -26,7 +26,7 @@
             Console.WriteLine("To Unpack a file: DeviPackUnpackTool -u " + @"""archiveFile.devi""");
             Console.WriteLine("");
             Console.WriteLine("To Unpack single file: DeviPackUnpackTool -uf " + @"""archiveFile.devi""" + " " +
-                @"""MyStuff\TestFiles\Readme.txt""");
+                @"""MyStuff\TestFiles\Readme.pdf""");
             Console.WriteLine("To Unpack file paths: DeviPackUnpackTool -up " + @"""archiveFile.devi""");
             Environment.Exit(0);
         }
