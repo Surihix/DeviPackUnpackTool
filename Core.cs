@@ -1,11 +1,24 @@
 ﻿using DeviPackUnpackTool;
 
 
-bool CheckArgs = args.Length < 2;
-switch (CheckArgs)
+bool CheckIfArgIsHelp = args[0].Contains("-?");
+switch (CheckIfArgIsHelp)
 {
     case true:
-        DEcmnMethods.ErrorExit("Error: Enough arguments not specified");
+        DEhelp.ShowCommands();
+        break;
+
+    case false:
+        break;
+}
+
+bool CheckArgsLength = args.Length < 2;
+switch (CheckArgsLength)
+{
+    case true:
+        Console.WriteLine("Warning: Enough arguments not specified");
+        Console.WriteLine("");
+        DEhelp.ShowCommands();
         break;
     case false:
         break;
@@ -14,6 +27,45 @@ switch (CheckArgs)
 var ToolAction = args[0];
 var InFileOrFolder = args[1];
 
+var CompLvl = "";
+bool CheckIfSetToPack = ToolAction.Contains("-p");
+switch (CheckIfSetToPack)
+{
+    case true:
+        bool CheckArgCount = args.Length > 2;
+
+        switch (CheckArgCount)
+        {
+            case true:
+                break;
+
+            case false:
+                DEcmn.ErrorExit("Error: Compression level is not specified");
+                break;
+        }
+
+        CompLvl = args[2];
+
+        string[] ValidCompLvls = { "-c0", "-c1", "-c2", "-c3" };
+
+        bool CheckIfCompLvlIsValid = ValidCompLvls.Contains(CompLvl);
+        switch (CheckIfCompLvlIsValid)
+        {
+            case true:
+                break;
+
+            case false:
+                Console.WriteLine("Error: Valid Compression level is not specified");
+                Console.WriteLine("");
+                DEhelp.ShowCommands();
+                break;
+        }
+        break;
+
+    case false:
+        break;
+}
+
 switch (ToolAction)
 {
     case "-p":
@@ -21,11 +73,11 @@ switch (ToolAction)
         switch (InFolderDirExists)
         {
             case true:
-                DEpack.PackFolder(InFileOrFolder);
+                DEpack.PackFolder(InFileOrFolder, CompLvl);
                 break;
 
             case false:
-                DEcmnMethods.ErrorExit("Error: Specified folder in the argument does not exist");
+                DEcmn.ErrorExit("Error: Specified folder in the argument does not exist");
                 break;
         }
         break;
@@ -39,12 +91,12 @@ switch (ToolAction)
                 break;
 
             case false:
-                DEcmnMethods.ErrorExit("Error: Specified file in the argument does not exist");
+                DEcmn.ErrorExit("Error: Specified file in the argument does not exist");
                 break;
         }
         break;
 
     default:
-        DEcmnMethods.ErrorExit("Error: Specified tool action is invalid");
+        DEcmn.ErrorExit("Error: Specified tool action is invalid");
         break;
 }

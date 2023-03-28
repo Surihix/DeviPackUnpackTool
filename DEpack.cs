@@ -5,21 +5,36 @@ namespace DeviPackUnpackTool
 {
     internal class DEpack
     {
-        public static void PackFolder(string InFolder)
+        public static void PackFolder(string InFolder, string CompLvlVar)
         {
+            CompLvlVar = CompLvlVar.Replace("-", "");
+            var DefinedCompLvl = CompressionLevel.NoCompression;
+
+            bool ParsedCompLvl = Enum.TryParse(CompLvlVar, false, out CustomCompLvls SpecificLvl);
+            switch (ParsedCompLvl)
+            {
+                case true:
+                    DefinedCompLvl = (CompressionLevel)SpecificLvl;
+                    break;
+
+                case false:
+                    break;
+            }
+
             var DeviPackFile = InFolder + ".devi";
             var TmpPathsFile = InFolder + "\\_paths";
-            var TmpOffsetFile = InFolder + "\\_offsets";
+            var TmpOffsetTableFile = InFolder + "\\_offsets";
             var TmpDataFile = InFolder + "\\_datas";
             var TmpCmpDataFile = InFolder + "\\_CurrentCmpData";
 
-            DEcmnMethods.CheckAndDelFile(DeviPackFile);
-            DEcmnMethods.CheckAndDelFile(TmpPathsFile);
-            DEcmnMethods.CheckAndDelFile(TmpDataFile);
-            DEcmnMethods.CheckAndDelFile(TmpCmpDataFile);
+            CheckAndDelFile(DeviPackFile);
+            CheckAndDelFile(TmpPathsFile);
+            CheckAndDelFile(TmpDataFile);
+            CheckAndDelFile(TmpCmpDataFile);
 
-            // Check if all the files in the folder
-            // exceed more than 4gb 
+
+            // Check if all the file sizes and the number of
+            // files in the folder exceed a uint32 range 
             var InFolderNameLength = InFolder.Length;
             string[] DirectoryToPack = Directory.GetFiles(InFolder, "*", SearchOption.AllDirectories);
             long FileCount = DirectoryToPack.Length;
@@ -37,22 +52,33 @@ namespace DeviPackUnpackTool
             CheckUInt32Range(CheckTotalSizeOfFiles);
             CheckUInt32Range(CheckTotalFileCount);
 
-            Console.WriteLine("Compressing....");
-            Console.WriteLine("");
+            bool CheckThereIsNoFileInDir = FileCount.Equals(0);
+            switch (CheckThereIsNoFileInDir)
+            {
+                case true:
+                    DEcmn.ErrorExit("Error: There are no files in the specified folder to make a devi archive");
+                    break;
 
+                case false:
+                    break;
+            }
+
+
+            Console.WriteLine("Packing files....");
+            Console.WriteLine("");
 
             using (FileStream PathsFile = new(TmpPathsFile, FileMode.Append, FileAccess.Write))
             {
                 using (FileStream DatasFile = new(TmpDataFile, FileMode.Append, FileAccess.Write))
                 {
-                    using (FileStream OffsetsFile = new(TmpOffsetFile, FileMode.Append, FileAccess.Write))
+                    using (FileStream OffsetTableFile = new(TmpOffsetTableFile, FileMode.Append, FileAccess.Write))
                     {
-                        OffsetsFile.Seek(0, SeekOrigin.Begin);
-                        AddNullBytes(OffsetsFile, 0, (uint)FileCount * 12);
+                        OffsetTableFile.Seek(0, SeekOrigin.Begin);
+                        AddNullBytes(OffsetTableFile, 0, (uint)FileCount * 12);
 
                         using (StreamWriter PathsWriter = new(PathsFile))
                         {
-                            using (BinaryWriter OffsetsWriter = new(OffsetsFile))
+                            using (BinaryWriter OffsetsWriter = new(OffsetTableFile))
                             {
 
                                 uint OffsetWritingPos = 0;
@@ -68,7 +94,7 @@ namespace DeviPackUnpackTool
 
                                     using (FileStream SubFile = new(file, FileMode.Open, FileAccess.Read))
                                     {
-                                        ZlibCompress(SubFile, TmpCmpDataFile);
+                                        ZlibCompress(SubFile, TmpCmpDataFile, DefinedCompLvl);
                                         var CmpFileSize = (uint)new FileInfo(TmpCmpDataFile).Length;
 
                                         using (FileStream CmpStream = new(TmpCmpDataFile, FileMode.Open, FileAccess.Read))
@@ -83,11 +109,11 @@ namespace DeviPackUnpackTool
                                             WriteByteValues(OffsetsWriter, OffsetWritingPos + 8, CmpFileSize);
 
                                             OffsetWritingPos += 12;
-                                            Console.WriteLine("Compressed " + VirtualPath);                                         
-                                        }                                        
+                                            Console.WriteLine("Packed " + VirtualPath);
+                                        }
                                     }
 
-                                    DEcmnMethods.CheckAndDelFile(TmpCmpDataFile);
+                                    CheckAndDelFile(TmpCmpDataFile);
                                 }
                             }
                         }
@@ -103,7 +129,7 @@ namespace DeviPackUnpackTool
                     byte[] Header = new byte[] { 68, 101, 118, 105, 80, 97, 99, 107, 46, 118, 49, 46, 53, 00, 00, 00 };
                     DeviPackWriter.Write(Header);
 
-                    AddNullBytes(DeviPack, 16, 24);
+                    AddNullBytes(DeviPack, 16, 20);
 
                     WriteByteValues(DeviPackWriter, 16, (uint)FileCount);
                     WriteByteValues(DeviPackWriter, 20, 40);
@@ -112,13 +138,13 @@ namespace DeviPackUnpackTool
 
                     using (FileStream PackedPathsFile = new(TmpPathsFile, FileMode.Open, FileAccess.Read))
                     {
-                        ZlibCompress(PackedPathsFile, TmpCmpDataFile);
+                        ZlibCompress(PackedPathsFile, TmpCmpDataFile, DefinedCompLvl);
 
                         using (FileStream CmpPathsData = new(TmpCmpDataFile, FileMode.Open, FileAccess.Read))
                         {
                             CmpPathsData.CopyTo(DeviPack);
                         }
-                        using (FileStream PackedOffsets = new(TmpOffsetFile, FileMode.Open, FileAccess.Read))
+                        using (FileStream PackedOffsets = new(TmpOffsetTableFile, FileMode.Open, FileAccess.Read))
                         {
                             PackedOffsets.CopyTo(DeviPack);
                         }
@@ -129,20 +155,20 @@ namespace DeviPackUnpackTool
                     }
 
                     var FilePathsSize = (uint)new FileInfo(TmpPathsFile).Length;
-                    WriteByteValues(DeviPackWriter, 32, FilePathsSize);
+                    WriteByteValues(DeviPackWriter, 28, FilePathsSize);
 
                     var CmpFilePathsSize = (uint)new FileInfo(TmpCmpDataFile).Length;
-                    WriteByteValues(DeviPackWriter, 36, CmpFilePathsSize);
+                    WriteByteValues(DeviPackWriter, 32, CmpFilePathsSize);
 
-                    var OffsetStartPos = CmpFilePathsSize + 40;
-                    WriteByteValues(DeviPackWriter, 24, OffsetStartPos);
+                    var OffsetTableStartPos = CmpFilePathsSize + 36;
+                    WriteByteValues(DeviPackWriter, 20, OffsetTableStartPos);
 
-                    var OffsetsFileSize = (uint)new FileInfo(TmpOffsetFile).Length;
-                    var DataStartPos = OffsetStartPos + OffsetsFileSize;
-                    WriteByteValues(DeviPackWriter, 28, DataStartPos);
+                    var OffsetTableFileSize = (uint)new FileInfo(TmpOffsetTableFile).Length;
+                    var DataStartPos = OffsetTableStartPos + OffsetTableFileSize;
+                    WriteByteValues(DeviPackWriter, 24, DataStartPos);
 
                     File.Delete(TmpPathsFile);
-                    File.Delete(TmpOffsetFile);
+                    File.Delete(TmpOffsetTableFile);
                     File.Delete(TmpDataFile);
                     File.Delete(TmpCmpDataFile);
                 }
@@ -157,7 +183,7 @@ namespace DeviPackUnpackTool
                     Console.WriteLine("Error: Total file size or file count in the folder is greater than 4294967296");
                     Console.WriteLine("Check if there is a file in the folder that is more than 4gb or check if the");
                     Console.WriteLine("total number of files in the folder you are trying to pack is less than 4294967296");
-                    DEcmnMethods.ErrorExit("");
+                    DEcmn.ErrorExit("");
                     break;
 
                 case false:
@@ -174,10 +200,18 @@ namespace DeviPackUnpackTool
             }
         }
 
-        static void ZlibCompress(FileStream StreamToCompress, string FileNameForDataOutFile)
+        enum CustomCompLvls
+        {
+            c0 = CompressionLevel.NoCompression,
+            c1 = CompressionLevel.Fastest,
+            c2 = CompressionLevel.Optimal,
+            c3 = CompressionLevel.SmallestSize
+        }
+
+        static void ZlibCompress(FileStream StreamToCompress, string FileNameForDataOutFile, CompressionLevel Clvel)
         {
             using FileStream ZlibDataOut = new(FileNameForDataOutFile, FileMode.OpenOrCreate, FileAccess.Write);
-            using ZLibStream Compressor = new(ZlibDataOut, CompressionLevel.SmallestSize);
+            using ZLibStream Compressor = new(ZlibDataOut, Clvel);
             StreamToCompress.CopyTo(Compressor);
         }
 
@@ -187,6 +221,20 @@ namespace DeviPackUnpackTool
             var AdjustValue = new byte[4];
             BinaryPrimitives.WriteUInt32LittleEndian(AdjustValue, VarToAdjustWith);
             WriterName.Write(AdjustValue);
+        }
+
+        static void CheckAndDelFile(string FileName)
+        {
+            bool FileCheck = File.Exists(FileName);
+            switch (FileCheck)
+            {
+                case true:
+                    File.Delete(FileName);
+                    break;
+
+                case false:
+                    break;
+            }
         }
     }
 }
