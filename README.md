@@ -10,4 +10,4 @@ in a text file.
 
 
 # For Developers
-Refer to this [Format Structure](https://github.com/Surihix/DeviPackUnpackTool/blob/master/FormatStruct.md) page to learn more about the structure of the archive file made with this tool.
+Refer to this [Format Structure](https://github.com/Surihix/DeviPackUnpackTool/blob/master/FormatStruct.md) page to learn more about the structure of the archive file made with this app.
