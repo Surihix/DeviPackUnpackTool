@@ -1,7 +1,7 @@
 ﻿using DeviPackUnpackTool;
 
 
-bool CheckIfArgIsHelp = args[0].Contains("-?");
+bool CheckIfArgIsHelp = args[0].Contains("-?") || args[0].Contains("-h");
 switch (CheckIfArgIsHelp)
 {
     case true:
