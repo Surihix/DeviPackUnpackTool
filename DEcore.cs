@@ -66,10 +66,13 @@ switch (CheckIfSetToPack)
         break;
 }
 
+bool InFolderDirExists = false;
+bool InFileExists = false;
+
 switch (ToolAction)
 {
     case "-p":
-        bool InFolderDirExists = Directory.Exists(InFileOrFolder);
+        InFolderDirExists = Directory.Exists(InFileOrFolder);
         switch (InFolderDirExists)
         {
             case true:
@@ -83,11 +86,25 @@ switch (ToolAction)
         break;
 
     case "-u":
-        bool InFileExists = File.Exists(InFileOrFolder);
+        InFileExists = File.Exists(InFileOrFolder);
         switch (InFileExists)
         {
             case true:
                 DEunpack.UnpackFile(InFileOrFolder);
+                break;
+
+            case false:
+                DEcmn.ErrorExit("Error: Specified file in the argument does not exist");
+                break;
+        }
+        break;
+
+    case "-up":
+        InFileExists = File.Exists(InFileOrFolder);
+        switch (InFileExists)
+        {
+            case true:
+                DEunpack.UnpackFilePaths(InFileOrFolder);
                 break;
 
             case false:

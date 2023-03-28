@@ -27,10 +27,10 @@ namespace DeviPackUnpackTool
             var TmpDataFile = InFolder + "\\_datas";
             var TmpCmpDataFile = InFolder + "\\_CurrentCmpData";
 
-            CheckAndDelFile(DeviPackFile);
-            CheckAndDelFile(TmpPathsFile);
-            CheckAndDelFile(TmpDataFile);
-            CheckAndDelFile(TmpCmpDataFile);
+            DEcmn.CheckAndDelFile(DeviPackFile);
+            DEcmn.CheckAndDelFile(TmpPathsFile);
+            DEcmn.CheckAndDelFile(TmpDataFile);
+            DEcmn.CheckAndDelFile(TmpCmpDataFile);
 
 
             // Check if all the file sizes and the number of
@@ -113,7 +113,7 @@ namespace DeviPackUnpackTool
                                         }
                                     }
 
-                                    CheckAndDelFile(TmpCmpDataFile);
+                                    DEcmn.CheckAndDelFile(TmpCmpDataFile);
                                 }
                             }
                         }
@@ -221,20 +221,6 @@ namespace DeviPackUnpackTool
             var AdjustValue = new byte[4];
             BinaryPrimitives.WriteUInt32LittleEndian(AdjustValue, VarToAdjustWith);
             WriterName.Write(AdjustValue);
-        }
-
-        static void CheckAndDelFile(string FileName)
-        {
-            bool FileCheck = File.Exists(FileName);
-            switch (FileCheck)
-            {
-                case true:
-                    File.Delete(FileName);
-                    break;
-
-                case false:
-                    break;
-            }
         }
     }
 }

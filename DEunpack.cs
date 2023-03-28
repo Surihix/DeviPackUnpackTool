@@ -7,7 +7,9 @@ namespace DeviPackUnpackTool
     {
         public static void UnpackFile(string InFile)
         {
-            var ExtractDir = InFile.Replace(".devi", "") + "\\";
+            var InFilePath = Path.GetFullPath(InFile);
+            var InFileDir = Path.GetDirectoryName(InFilePath);
+            var ExtractDir = InFileDir + "\\" + Path.GetFileNameWithoutExtension(InFile) + "\\";
 
             bool CheckAndDelOldExtractDir = Directory.Exists(ExtractDir);
             switch (CheckAndDelOldExtractDir)
@@ -25,24 +27,11 @@ namespace DeviPackUnpackTool
             Console.WriteLine("Unpacking files....");
             Console.WriteLine("");
 
-            using (FileStream DeviFile = new FileStream(InFile, FileMode.Open, FileAccess.Read))
+            using (FileStream DeviFile = new(InFile, FileMode.Open, FileAccess.Read))
             {
                 using (BinaryReader DeviFileReader = new(DeviFile))
                 {
-                    DeviFileReader.BaseStream.Position = 0;
-                    var GetArchiveHeader = DeviFileReader.ReadChars(16);
-                    var ArchiveHeader = string.Join("", GetArchiveHeader).Replace("\0", "");
-
-                    bool CheckArchiveHeader = ArchiveHeader.StartsWith("DeviPack.v1.5");
-                    switch (CheckArchiveHeader)
-                    {
-                        case true:
-                            break;
-
-                        case false:
-                            DEcmn.ErrorExit("Error: This is not a valid DeviPack archive file");
-                            break;
-                    }
+                    CheckArchiveHeader(DeviFileReader);
 
                     ReadByteValue(DeviFileReader, 16, out uint FileCount);
                     ReadByteValue(DeviFileReader, 20, out uint OffsetTablePos);
@@ -67,15 +56,7 @@ namespace DeviPackUnpackTool
                                 {
                                     var MainFilePath = "";
 
-                                    DcmpPathReader.BaseStream.Position = PathReaderPos;
-
-                                    var FileNameBuilder = new StringBuilder();
-                                    char StringChars;
-                                    while ((StringChars = DcmpPathReader.ReadChar()) != default)
-                                    {
-                                        FileNameBuilder.Append(StringChars);
-                                    }
-                                    MainFilePath = FileNameBuilder.ToString();
+                                    FileNamesBuilder(DcmpPathReader, PathReaderPos, ref MainFilePath);
 
                                     ReadByteValue(DeviFileReader, OffsetTablePos + OffsetTblReaderPos, out var FileStartPos);
                                     ReadByteValue(DeviFileReader, OffsetTablePos + OffsetTblReaderPos + 8, out var FileCmpSize);
@@ -95,8 +76,8 @@ namespace DeviPackUnpackTool
                                             switch (CheckIfNeedDir)
                                             {
                                                 case true:
-                                                    break; 
-                                                
+                                                    break;
+
                                                 case false:
                                                     Directory.CreateDirectory(ExtractDir + DirectoryOfFile);
                                                     break;
@@ -126,7 +107,7 @@ namespace DeviPackUnpackTool
                                         }
                                     }
 
-                                    Console.WriteLine("Unpacked " + FinalOutFilePath);
+                                    Console.WriteLine("Unpacked " + MainFilePath);
 
                                     PathReaderPos = (uint)DcmpPathReader.BaseStream.Position;
                                     OffsetTblReaderPos += 12;
@@ -135,6 +116,80 @@ namespace DeviPackUnpackTool
                         }
                     }
                 }
+            }
+        }
+
+
+        public static void UnpackFilePaths(string InFile)
+        {
+            var InFilePath = Path.GetFullPath(InFile);
+            var ExtractDir = Path.GetDirectoryName(InFilePath) + "\\";
+            var TxtFileName = Path.GetFileNameWithoutExtension(InFile) + ".txt";
+            var OutTxtFile = ExtractDir + TxtFileName;
+
+            DEcmn.CheckAndDelFile(OutTxtFile);
+
+
+            Console.WriteLine("Unpacking file paths....");
+            Console.WriteLine("");
+
+            using (FileStream DeviFile = new(InFile, FileMode.Open, FileAccess.Read))
+            {
+                using (BinaryReader DeviFileReader = new(DeviFile))
+                {
+                    CheckArchiveHeader(DeviFileReader);
+
+                    ReadByteValue(DeviFileReader, 16, out uint FileCount);
+                    ReadByteValue(DeviFileReader, 32, out uint PathsCmpSize);
+
+                    using (MemoryStream PathStream = new())
+                    {
+                        DeviFile.CopyTo(PathStream, 36, PathsCmpSize);
+
+                        using (MemoryStream DcmpPathStream = new())
+                        {
+                            PathStream.Seek(0, SeekOrigin.Begin);
+                            ZlibDecompress(PathStream, DcmpPathStream);
+
+                            using (BinaryReader DcmpPathReader = new(DcmpPathStream))
+                            {
+                                using (StreamWriter PathsWriter = new(OutTxtFile, append: true))
+                                {
+
+                                    uint PathReaderPos = 0;
+                                    for (int f = 0; f < FileCount; f++)
+                                    {
+                                        var MainFilePath = "";
+
+                                        FileNamesBuilder(DcmpPathReader, PathReaderPos, ref MainFilePath);
+
+                                        PathsWriter.WriteLine(MainFilePath);
+
+                                        PathReaderPos = (uint)DcmpPathReader.BaseStream.Position;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        static void CheckArchiveHeader(BinaryReader ReaderName)
+        {
+            ReaderName.BaseStream.Position = 0;
+            var GetArchiveHeader = ReaderName.ReadChars(16);
+            var ArchiveHeader = string.Join("", GetArchiveHeader).Replace("\0", "");
+
+            bool CheckArchiveHeader = ArchiveHeader.StartsWith("DeviPack.v1.5");
+            switch (CheckArchiveHeader)
+            {
+                case true:
+                    break;
+
+                case false:
+                    DEcmn.ErrorExit("Error: This is not a valid DeviPack archive file");
+                    break;
             }
         }
 
@@ -150,6 +205,18 @@ namespace DeviPackUnpackTool
             {
                 ZlibDataDcmp.CopyTo(StreamToHoldDcmpData);
             }
+        }
+
+        static void FileNamesBuilder(BinaryReader ReaderName, uint ReaderPos, ref string VarName)
+        {
+            ReaderName.BaseStream.Position = ReaderPos;
+            var FileNameBuilder = new StringBuilder();
+            char StringChars;
+            while ((StringChars = ReaderName.ReadChar()) != default)
+            {
+                FileNameBuilder.Append(StringChars);
+            }
+            VarName = FileNameBuilder.ToString();
         }
     }
 }

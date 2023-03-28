@@ -1,8 +1,7 @@
 {
   "profiles": {
     "DeviPackUnpackTool": {
-      "commandName": "Project",
-      "commandLineArgs": "-u \"Win 7 Ultimate wallpapers.devi\""
+      "commandName": "Project"
     }
   }
 }

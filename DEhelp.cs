@@ -5,9 +5,10 @@
         public static void ShowCommands()
         {
             Console.WriteLine("Valid functions:");
-            Console.WriteLine("-p = Pack a folder with files into a devi archive file");
+            Console.WriteLine("-p = Pack a folder with files to a devi archive file");
             Console.WriteLine("-u = Unpack a devi archive file");
-            Console.WriteLine("-? or -h = Show valid app functions");
+            Console.WriteLine("-up = Unpack all file paths from the archive to a text file");
+            Console.WriteLine("-? or -h = Show app functions");
             Console.WriteLine("");
             Console.WriteLine("When using -p function, you will have to specify a compression level argument");
             Console.WriteLine("");
@@ -20,6 +21,7 @@
             Console.WriteLine("Usage Examples:");
             Console.WriteLine("To pack a folder: DeviPackUnpackTool -p " + @"""Folder To pack""" + " -c3");
             Console.WriteLine("To Unpack a file: DeviPackUnpackTool -u " + @"""archiveFile.devi""");
+            Console.WriteLine("To Unpack file paths: DeviPackUnpackTool -up " + @"""archiveFile.devi""");
             Environment.Exit(0);
         }
     }
