@@ -1,6 +1,7 @@
 ﻿using DeviPackUnpackTool;
 
 
+// Display Help page according to the argument
 bool CheckIfArgIsHelp = args[0].Contains("-?") || args[0].Contains("-h");
 switch (CheckIfArgIsHelp)
 {
@@ -12,6 +13,8 @@ switch (CheckIfArgIsHelp)
         break;
 }
 
+
+// Check the default argument length
 bool CheckArgsLength = args.Length < 2;
 switch (CheckArgsLength)
 {
@@ -27,6 +30,9 @@ switch (CheckArgsLength)
 var ToolAction = args[0];
 var InFileOrFolder = args[1];
 
+
+// Check if compression level is specified if tool 
+// is set to use the pack function
 var CompLvl = "";
 bool CheckIfSetToPack = ToolAction.Contains("-p");
 switch (CheckIfSetToPack)
@@ -66,6 +72,37 @@ switch (CheckIfSetToPack)
         break;
 }
 
+
+// Check if Specific file is specified if tool 
+// is set to use the unpack single file function
+var SpecificFilePath = "";
+bool CheckIfSetToUnpkOneFile = ToolAction.Contains("-uf");
+switch (CheckIfSetToUnpkOneFile)
+{
+    case true:
+        bool CheckArgCount = args.Length > 2;
+
+        switch (CheckArgCount)
+        {
+            case true:
+                break;
+
+            case false:
+                DEcmn.ErrorExit("Error: Compression level is not specified");
+                break;
+        }
+
+        SpecificFilePath = args[2];
+        break;
+
+    case false:
+        break;
+}
+
+
+
+// According to the set function, launch the
+// respective class file
 bool InFolderDirExists = false;
 bool InFileExists = false;
 
@@ -90,7 +127,21 @@ switch (ToolAction)
         switch (InFileExists)
         {
             case true:
-                DEunpack.UnpackFile(InFileOrFolder);
+                DEunpack.UnpackFiles(InFileOrFolder);
+                break;
+
+            case false:
+                DEcmn.ErrorExit("Error: Specified file in the argument does not exist");
+                break;
+        }
+        break;
+
+    case "-uf":
+        InFileExists = File.Exists(InFileOrFolder);
+        switch (InFileExists)
+        {
+            case true:
+                DEunpack.UnpackSingleFile(InFileOrFolder, SpecificFilePath);
                 break;
 
             case false:

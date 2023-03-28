@@ -173,6 +173,9 @@ namespace DeviPackUnpackTool
                     File.Delete(TmpCmpDataFile);
                 }
             }
+
+            Console.WriteLine("");
+            Console.WriteLine("Finished packing files into the archive");
         }
 
         static void CheckUInt32Range(bool VarToCheck)
