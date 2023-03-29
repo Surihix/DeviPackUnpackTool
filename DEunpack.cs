@@ -1,359 +1,317 @@
 ﻿using System.IO.Compression;
 using System.Text;
 
-namespace DeviPackUnpackTool
+namespace DeviPackUnpackTool;
+
+internal class DEunpack
 {
-    internal class DEunpack
+    // Unpack all files
+    public static void UnpackFiles(string inFile)
     {
-        // Unpack all files
-        public static void UnpackFiles(string InFile)
+        CreateExtractDir(inFile, out string extractDir);
+
+
+        Console.WriteLine("Unpacking files....");
+        Console.WriteLine("");
+
+        using (FileStream deviFile = new(inFile, FileMode.Open, FileAccess.Read))
         {
-            var InFilePath = Path.GetFullPath(InFile);
-            var InFileDir = Path.GetDirectoryName(InFilePath);
-            var ExtractDir = InFileDir + "\\" + Path.GetFileNameWithoutExtension(InFile) + "\\";
-
-            bool CheckAndDelOldExtractDir = Directory.Exists(ExtractDir);
-            switch (CheckAndDelOldExtractDir)
+            using (BinaryReader deviFileReader = new(deviFile))
             {
-                case true:
-                    Directory.Delete(ExtractDir, true);
-                    break;
+                CheckArchiveHeader(deviFileReader);
 
-                case false:
-                    break;
-            }
-            Directory.CreateDirectory(ExtractDir);
+                ReadByteValue(deviFileReader, 16, out uint fileCount);
+                ReadByteValue(deviFileReader, 20, out uint offsetTablePos);
+                ReadByteValue(deviFileReader, 24, out uint dataStartPos);
+                ReadByteValue(deviFileReader, 32, out uint pathsCmpSize);
 
-
-            Console.WriteLine("Unpacking files....");
-            Console.WriteLine("");
-
-            using (FileStream DeviFile = new(InFile, FileMode.Open, FileAccess.Read))
-            {
-                using (BinaryReader DeviFileReader = new(DeviFile))
+                using (MemoryStream pathStream = new())
                 {
-                    CheckArchiveHeader(DeviFileReader);
+                    deviFile.CopyTo(pathStream, 36, pathsCmpSize);
 
-                    ReadByteValue(DeviFileReader, 16, out uint FileCount);
-                    ReadByteValue(DeviFileReader, 20, out uint OffsetTablePos);
-                    ReadByteValue(DeviFileReader, 24, out uint DataStartPos);
-                    ReadByteValue(DeviFileReader, 32, out uint PathsCmpSize);
-
-                    using (MemoryStream PathStream = new())
+                    using (MemoryStream dcmpPathStream = new())
                     {
-                        DeviFile.CopyTo(PathStream, 36, PathsCmpSize);
+                        pathStream.Seek(0, SeekOrigin.Begin);
+                        ZlibDecompress(pathStream, dcmpPathStream);
 
-                        using (MemoryStream DcmpPathStream = new())
+                        using (BinaryReader dcmpPathReader = new(dcmpPathStream))
                         {
-                            PathStream.Seek(0, SeekOrigin.Begin);
-                            ZlibDecompress(PathStream, DcmpPathStream);
 
-                            using (BinaryReader DcmpPathReader = new(DcmpPathStream))
+                            uint pathReaderPos = 0;
+                            uint offsetTblReaderPos = 0;
+                            for (int f = 0; f < fileCount; f++)
                             {
+                                var mainFilePath = "";
 
-                                uint PathReaderPos = 0;
-                                uint OffsetTblReaderPos = 0;
-                                for (int f = 0; f < FileCount; f++)
+                                FileNamesBuilder(dcmpPathReader, pathReaderPos, ref mainFilePath);
+
+                                ReadByteValue(deviFileReader, offsetTablePos + offsetTblReaderPos, out var fileStartPos);
+                                ReadByteValue(deviFileReader, offsetTablePos + offsetTblReaderPos + 8, out var fileCmpSize);
+
+                                var directoryOfFile = Path.GetDirectoryName(mainFilePath);
+                                var fileName = Path.GetFileName(mainFilePath);
+                                var finalOutFilePath = extractDir + directoryOfFile + "\\" + fileName;
+
+                                // Check if the directory of the file does not exist
+                                // If it does not exist, then check if the directory
+                                // name string is not null and if the directory 
+                                // string equals "", then create a directory
+                                if (!Directory.Exists(directoryOfFile))
                                 {
-                                    var MainFilePath = "";
-
-                                    FileNamesBuilder(DcmpPathReader, PathReaderPos, ref MainFilePath);
-
-                                    ReadByteValue(DeviFileReader, OffsetTablePos + OffsetTblReaderPos, out var FileStartPos);
-                                    ReadByteValue(DeviFileReader, OffsetTablePos + OffsetTblReaderPos + 8, out var FileCmpSize);
-
-                                    var DirectoryOfFile = Path.GetDirectoryName(MainFilePath);
-                                    var FileName = Path.GetFileName(MainFilePath);
-                                    var FinalOutFilePath = ExtractDir + DirectoryOfFile + "\\" + FileName;
-
-                                    bool CheckAndCreateDirectory = Directory.Exists(DirectoryOfFile);
-                                    switch (CheckAndCreateDirectory)
+                                    if (directoryOfFile is not null)
                                     {
-                                        case true:
-                                            break;
-
-                                        case false:
-                                            bool CheckIfNeedDir = DirectoryOfFile.Equals("");
-                                            switch (CheckIfNeedDir)
-                                            {
-                                                case true:
-                                                    break;
-
-                                                case false:
-                                                    Directory.CreateDirectory(ExtractDir + DirectoryOfFile);
-                                                    break;
-                                            }
-                                            break;
-                                    }
-
-                                    bool CheckAndDelFile = File.Exists(FinalOutFilePath);
-                                    switch (CheckAndDelFile)
-                                    {
-                                        case true:
-                                            File.Delete(FinalOutFilePath);
-                                            break;
-
-                                        case false:
-                                            break;
-                                    }
-
-                                    using (FileStream OutFile = new(FinalOutFilePath, FileMode.OpenOrCreate, FileAccess.Write))
-                                    {
-                                        using (MemoryStream CmpFileData = new())
+                                        if (!directoryOfFile.Equals(""))
                                         {
-                                            DeviFile.CopyTo(CmpFileData, DataStartPos + FileStartPos, FileCmpSize);
+                                            Directory.CreateDirectory(extractDir + directoryOfFile);
+                                        }
+                                    }
+                                }
 
-                                            CmpFileData.Seek(0, SeekOrigin.Begin);
-                                            ZlibDecompress(CmpFileData, OutFile);
+                                if (File.Exists(finalOutFilePath))
+                                {
+                                    File.Delete(finalOutFilePath);
+                                }
+
+                                using (FileStream outFile = new(finalOutFilePath, FileMode.OpenOrCreate, FileAccess.Write))
+                                {
+                                    using (MemoryStream cmpFileData = new())
+                                    {
+                                        deviFile.CopyTo(cmpFileData, dataStartPos + fileStartPos, fileCmpSize);
+
+                                        cmpFileData.Seek(0, SeekOrigin.Begin);
+                                        ZlibDecompress(cmpFileData, outFile);
+                                    }
+                                }
+
+                                Console.WriteLine("Unpacked " + mainFilePath);
+
+                                pathReaderPos = (uint)dcmpPathReader.BaseStream.Position;
+                                offsetTblReaderPos += 12;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Console.WriteLine("");
+        Console.WriteLine("Finished unpacking files");
+    }
+
+    // Unpack a single file
+    public static void UnpackSingleFile(string inFile, string specificFilePath)
+    {
+        CreateExtractDir(inFile, out string extractDir);
+
+
+        Console.WriteLine("Unpacking a single file....");
+        Console.WriteLine("");
+
+        using (FileStream deviFile = new(inFile, FileMode.Open, FileAccess.Read))
+        {
+            using (BinaryReader deviFileReader = new(deviFile))
+            {
+                CheckArchiveHeader(deviFileReader);
+
+                ReadByteValue(deviFileReader, 16, out uint fileCount);
+                ReadByteValue(deviFileReader, 20, out uint offsetTablePos);
+                ReadByteValue(deviFileReader, 24, out uint dataStartPos);
+                ReadByteValue(deviFileReader, 32, out uint pathsCmpSize);
+
+                using (MemoryStream pathStream = new())
+                {
+                    deviFile.CopyTo(pathStream, 36, pathsCmpSize);
+
+                    using (MemoryStream dcmpPathStream = new())
+                    {
+                        pathStream.Seek(0, SeekOrigin.Begin);
+                        ZlibDecompress(pathStream, dcmpPathStream);
+
+                        using (BinaryReader dcmpPathReader = new(dcmpPathStream))
+                        {
+
+                            uint pathReaderPos = 0;
+                            uint offsetTblReaderPos = 0;
+                            for (int f = 0; f < fileCount; f++)
+                            {
+                                var mainFilePath = "";
+
+                                FileNamesBuilder(dcmpPathReader, pathReaderPos, ref mainFilePath);
+
+                                ReadByteValue(deviFileReader, offsetTablePos + offsetTblReaderPos, out var fileStartPos);
+                                ReadByteValue(deviFileReader, offsetTablePos + offsetTblReaderPos + 8, out var fileCmpSize);
+
+                                // If the main file path equals the specific file
+                                // path, then do the following:
+                                // Check if the directory of the file does not exist
+                                // If it does not exist, then check if the directory
+                                // name string is not null and if the directory 
+                                // string equals "", then create a directory
+                                if (mainFilePath.Equals(specificFilePath))
+                                {
+                                    var directoryOfFile = Path.GetDirectoryName(mainFilePath);
+                                    var fileName = Path.GetFileName(mainFilePath);
+                                    var finalOutFilePath = extractDir + directoryOfFile + "\\" + fileName;
+
+                                    if (!Directory.Exists(directoryOfFile))
+                                    {
+                                        if (directoryOfFile is not null)
+                                        {
+                                            if (!directoryOfFile.Equals(""))
+                                            {
+                                                Directory.CreateDirectory(extractDir + directoryOfFile);
+                                            }
                                         }
                                     }
 
-                                    Console.WriteLine("Unpacked " + MainFilePath);
+                                    if (File.Exists(finalOutFilePath))
+                                    {
+                                        File.Delete(finalOutFilePath);
+                                    }
 
-                                    PathReaderPos = (uint)DcmpPathReader.BaseStream.Position;
-                                    OffsetTblReaderPos += 12;
+                                    using (FileStream outFile = new(finalOutFilePath, FileMode.OpenOrCreate, FileAccess.Write))
+                                    {
+                                        using (MemoryStream cmpFileData = new())
+                                        {
+                                            deviFile.CopyTo(cmpFileData, dataStartPos + fileStartPos, fileCmpSize);
+
+                                            cmpFileData.Seek(0, SeekOrigin.Begin);
+                                            ZlibDecompress(cmpFileData, outFile);
+                                        }
+                                    }
+
+                                    Console.WriteLine("Unpacked " + mainFilePath);
                                 }
+
+                                pathReaderPos = (uint)dcmpPathReader.BaseStream.Position;
+                                offsetTblReaderPos += 12;
                             }
                         }
                     }
                 }
             }
-
-            Console.WriteLine("");
-            Console.WriteLine("Finished unpacking files");
         }
 
-        // Unpack a single file
-        public static void UnpackSingleFile(string InFile, string SpecificFilePath)
+        Console.WriteLine("");
+        Console.WriteLine("Finished unpacking files");
+    }
+
+
+    // Unpack file paths
+    public static void UnpackFilePaths(string inFile)
+    {
+        var inFilePath = Path.GetFullPath(inFile);
+        var extractDir = Path.GetDirectoryName(inFilePath) + "\\";
+        var txtFileName = Path.GetFileNameWithoutExtension(inFile) + ".txt";
+        var outTxtFile = extractDir + txtFileName;
+
+        DEcmn.CheckAndDelFile(outTxtFile);
+
+
+        Console.WriteLine("Unpacking file paths....");
+        Console.WriteLine("");
+
+        using (FileStream deviFile = new(inFile, FileMode.Open, FileAccess.Read))
         {
-            var InFilePath = Path.GetFullPath(InFile);
-            var InFileDir = Path.GetDirectoryName(InFilePath);
-            var ExtractDir = InFileDir + "\\" + Path.GetFileNameWithoutExtension(InFile) + "\\";
-
-            bool CheckAndDelOldExtractDir = Directory.Exists(ExtractDir);
-            switch (CheckAndDelOldExtractDir)
+            using (BinaryReader deviFileReader = new(deviFile))
             {
-                case true:
-                    Directory.Delete(ExtractDir, true);
-                    break;
+                CheckArchiveHeader(deviFileReader);
 
-                case false:
-                    break;
-            }
-            Directory.CreateDirectory(ExtractDir);
+                ReadByteValue(deviFileReader, 16, out uint fileCount);
+                ReadByteValue(deviFileReader, 32, out uint pathsCmpSize);
 
-
-            Console.WriteLine("Unpacking a single file....");
-            Console.WriteLine("");
-
-            using (FileStream DeviFile = new(InFile, FileMode.Open, FileAccess.Read))
-            {
-                using (BinaryReader DeviFileReader = new(DeviFile))
+                using (MemoryStream pathStream = new())
                 {
-                    CheckArchiveHeader(DeviFileReader);
+                    deviFile.CopyTo(pathStream, 36, pathsCmpSize);
 
-                    ReadByteValue(DeviFileReader, 16, out uint FileCount);
-                    ReadByteValue(DeviFileReader, 20, out uint OffsetTablePos);
-                    ReadByteValue(DeviFileReader, 24, out uint DataStartPos);
-                    ReadByteValue(DeviFileReader, 32, out uint PathsCmpSize);
-
-                    using (MemoryStream PathStream = new())
+                    using (MemoryStream dcmpPathStream = new())
                     {
-                        DeviFile.CopyTo(PathStream, 36, PathsCmpSize);
+                        pathStream.Seek(0, SeekOrigin.Begin);
+                        ZlibDecompress(pathStream, dcmpPathStream);
 
-                        using (MemoryStream DcmpPathStream = new())
+                        using (BinaryReader dcmpPathReader = new(dcmpPathStream))
                         {
-                            PathStream.Seek(0, SeekOrigin.Begin);
-                            ZlibDecompress(PathStream, DcmpPathStream);
-
-                            using (BinaryReader DcmpPathReader = new(DcmpPathStream))
+                            using (StreamWriter pathsWriter = new(outTxtFile, append: true))
                             {
 
-                                uint PathReaderPos = 0;
-                                uint OffsetTblReaderPos = 0;
-                                for (int f = 0; f < FileCount; f++)
+                                uint pathReaderPos = 0;
+                                for (int f = 0; f < fileCount; f++)
                                 {
                                     var MainFilePath = "";
 
-                                    FileNamesBuilder(DcmpPathReader, PathReaderPos, ref MainFilePath);
+                                    FileNamesBuilder(dcmpPathReader, pathReaderPos, ref MainFilePath);
 
-                                    ReadByteValue(DeviFileReader, OffsetTablePos + OffsetTblReaderPos, out var FileStartPos);
-                                    ReadByteValue(DeviFileReader, OffsetTablePos + OffsetTblReaderPos + 8, out var FileCmpSize);
+                                    pathsWriter.WriteLine(MainFilePath);
 
-                                    bool CheckIfSpecificFile = MainFilePath.Equals(SpecificFilePath);
-                                    switch (CheckIfSpecificFile)
-                                    {
-                                        case true:
-                                            var DirectoryOfFile = Path.GetDirectoryName(MainFilePath);
-                                            var FileName = Path.GetFileName(MainFilePath);
-                                            var FinalOutFilePath = ExtractDir + DirectoryOfFile + "\\" + FileName;
-
-                                            bool CheckAndCreateDirectory = Directory.Exists(DirectoryOfFile);
-                                            switch (CheckAndCreateDirectory)
-                                            {
-                                                case true:
-                                                    break;
-
-                                                case false:
-                                                    bool CheckIfNeedDir = DirectoryOfFile.Equals("");
-                                                    switch (CheckIfNeedDir)
-                                                    {
-                                                        case true:
-                                                            break;
-
-                                                        case false:
-                                                            Directory.CreateDirectory(ExtractDir + DirectoryOfFile);
-                                                            break;
-                                                    }
-                                                    break;
-                                            }
-
-                                            bool CheckAndDelFile = File.Exists(FinalOutFilePath);
-                                            switch (CheckAndDelFile)
-                                            {
-                                                case true:
-                                                    File.Delete(FinalOutFilePath);
-                                                    break;
-
-                                                case false:
-                                                    break;
-                                            }
-
-                                            using (FileStream OutFile = new(FinalOutFilePath, FileMode.OpenOrCreate, 
-                                                FileAccess.Write))
-                                            {
-                                                using (MemoryStream CmpFileData = new())
-                                                {
-                                                    DeviFile.CopyTo(CmpFileData, DataStartPos + FileStartPos, FileCmpSize);
-
-                                                    CmpFileData.Seek(0, SeekOrigin.Begin);
-                                                    ZlibDecompress(CmpFileData, OutFile);
-                                                }
-                                            }
-                                            Console.WriteLine("Unpacked " + MainFilePath);
-                                            break;
-
-                                        case false:
-                                            break;
-
-                                    }
-
-                                    PathReaderPos = (uint)DcmpPathReader.BaseStream.Position;
-                                    OffsetTblReaderPos += 12;
+                                    pathReaderPos = (uint)dcmpPathReader.BaseStream.Position;
                                 }
                             }
                         }
                     }
                 }
             }
-
-            Console.WriteLine("");
-            Console.WriteLine("Finished unpacking files");
         }
 
+        Console.WriteLine("");
+        Console.WriteLine("Unpacked file paths to " + @"""" + txtFileName + @"""" + " file");
+    }
 
-        // Unpack file paths
-        public static void UnpackFilePaths(string InFile)
+
+    static void CreateExtractDir(string inFileVar, out string extractDirVar)
+    {
+        var inFilePath = Path.GetFullPath(inFileVar);
+        var inFileDir = Path.GetDirectoryName(inFilePath);
+        extractDirVar = inFileDir + "\\" + Path.GetFileNameWithoutExtension(inFileVar) + "\\";
+
+        if (Directory.Exists(extractDirVar))
         {
-            var InFilePath = Path.GetFullPath(InFile);
-            var ExtractDir = Path.GetDirectoryName(InFilePath) + "\\";
-            var TxtFileName = Path.GetFileNameWithoutExtension(InFile) + ".txt";
-            var OutTxtFile = ExtractDir + TxtFileName;
-
-            DEcmn.CheckAndDelFile(OutTxtFile);
-
-
-            Console.WriteLine("Unpacking file paths....");
-            Console.WriteLine("");
-
-            using (FileStream DeviFile = new(InFile, FileMode.Open, FileAccess.Read))
-            {
-                using (BinaryReader DeviFileReader = new(DeviFile))
-                {
-                    CheckArchiveHeader(DeviFileReader);
-
-                    ReadByteValue(DeviFileReader, 16, out uint FileCount);
-                    ReadByteValue(DeviFileReader, 32, out uint PathsCmpSize);
-
-                    using (MemoryStream PathStream = new())
-                    {
-                        DeviFile.CopyTo(PathStream, 36, PathsCmpSize);
-
-                        using (MemoryStream DcmpPathStream = new())
-                        {
-                            PathStream.Seek(0, SeekOrigin.Begin);
-                            ZlibDecompress(PathStream, DcmpPathStream);
-
-                            using (BinaryReader DcmpPathReader = new(DcmpPathStream))
-                            {
-                                using (StreamWriter PathsWriter = new(OutTxtFile, append: true))
-                                {
-
-                                    uint PathReaderPos = 0;
-                                    for (int f = 0; f < FileCount; f++)
-                                    {
-                                        var MainFilePath = "";
-
-                                        FileNamesBuilder(DcmpPathReader, PathReaderPos, ref MainFilePath);
-
-                                        PathsWriter.WriteLine(MainFilePath);
-
-                                        PathReaderPos = (uint)DcmpPathReader.BaseStream.Position;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            Console.WriteLine("");
-            Console.WriteLine("Unpacked file paths to " + @"""" + TxtFileName + @"""" + " file");
+            Directory.Delete(extractDirVar, true);
         }
+        Directory.CreateDirectory(extractDirVar);
+    }
 
 
-        static void CheckArchiveHeader(BinaryReader ReaderName)
+    static void CheckArchiveHeader(BinaryReader readerName)
+    {
+        readerName.BaseStream.Position = 0;
+        var getArchiveHeader = readerName.ReadChars(16);
+        var archiveHeader = string.Join("", getArchiveHeader).Replace("\0", "");
+
+        bool checkArchiveHeader = archiveHeader.StartsWith("DeviPack.v1.5");
+        switch (checkArchiveHeader)
         {
-            ReaderName.BaseStream.Position = 0;
-            var GetArchiveHeader = ReaderName.ReadChars(16);
-            var ArchiveHeader = string.Join("", GetArchiveHeader).Replace("\0", "");
+            case true:
+                break;
 
-            bool CheckArchiveHeader = ArchiveHeader.StartsWith("DeviPack.v1.5");
-            switch (CheckArchiveHeader)
-            {
-                case true:
-                    break;
-
-                case false:
-                    DEcmn.ErrorExit("Error: This is not a valid DeviPack archive file");
-                    break;
-            }
+            case false:
+                DEcmn.ErrorExit("Error: This is not a valid DeviPack archive file");
+                break;
         }
+    }
 
-        static void ReadByteValue(BinaryReader ReaderName, uint ReaderPos, out uint OutVariable)
+    static void ReadByteValue(BinaryReader readerName, uint readerPos, out uint outVariable)
+    {
+        readerName.BaseStream.Position = readerPos;
+        outVariable = readerName.ReadUInt32();
+    }
+
+    static void ZlibDecompress(Stream streamToDecompress, Stream streamToHoldDcmpData)
+    {
+        using (ZLibStream zlibDataDcmp = new(streamToDecompress, CompressionMode.Decompress))
         {
-            ReaderName.BaseStream.Position = ReaderPos;
-            OutVariable = ReaderName.ReadUInt32();
+            zlibDataDcmp.CopyTo(streamToHoldDcmpData);
         }
+    }
 
-        static void ZlibDecompress(Stream StreamToDecompress, Stream StreamToHoldDcmpData)
+    static void FileNamesBuilder(BinaryReader readerName, uint readerPos, ref string varName)
+    {
+        readerName.BaseStream.Position = readerPos;
+        var fileNameBuilder = new StringBuilder();
+        char stringChars;
+        while ((stringChars = readerName.ReadChar()) != default)
         {
-            using (ZLibStream ZlibDataDcmp = new(StreamToDecompress, CompressionMode.Decompress))
-            {
-                ZlibDataDcmp.CopyTo(StreamToHoldDcmpData);
-            }
+            fileNameBuilder.Append(stringChars);
         }
-
-        static void FileNamesBuilder(BinaryReader ReaderName, uint ReaderPos, ref string VarName)
-        {
-            ReaderName.BaseStream.Position = ReaderPos;
-            var FileNameBuilder = new StringBuilder();
-            char StringChars;
-            while ((StringChars = ReaderName.ReadChar()) != default)
-            {
-                FileNameBuilder.Append(StringChars);
-            }
-            VarName = FileNameBuilder.ToString();
-        }
+        varName = fileNameBuilder.ToString();
     }
 }

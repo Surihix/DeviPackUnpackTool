@@ -1,26 +1,25 @@
-﻿namespace DeviPackUnpackTool
+﻿namespace DeviPackUnpackTool;
+
+internal class DEcmn
 {
-    internal class DEcmn
+    public static void ErrorExit(string errorMsg)
     {
-        public static void ErrorExit(string ErrorMsg)
-        {
-            Console.WriteLine(ErrorMsg);
-            Console.ReadLine();
-            Environment.Exit(0);
-        }
+        Console.WriteLine(errorMsg);
+        Console.ReadLine();
+        Environment.Exit(0);
+    }
 
-        public static void CheckAndDelFile(string FileName)
+    public static void CheckAndDelFile(string fileName)
+    {
+        bool fileCheck = File.Exists(fileName);
+        switch (fileCheck)
         {
-            bool FileCheck = File.Exists(FileName);
-            switch (FileCheck)
-            {
-                case true:
-                    File.Delete(FileName);
-                    break;
+            case true:
+                File.Delete(fileName);
+                break;
 
-                case false:
-                    break;
-            }
+            case false:
+                break;
         }
     }
 }

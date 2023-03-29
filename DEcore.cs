@@ -4,130 +4,83 @@
 try
 {
     // Check the default argument length for help
-    bool CheckHelpArgLength = args.Length < 1;
-    switch (CheckHelpArgLength)
+    if (args.Length < 1)
     {
-        case true:
-            Console.WriteLine("Warning: Enough arguments not specified");
-            Console.WriteLine("");
-            DEhelp.ShowCommands();
-            break;
-        case false:
-            break;
+        Console.WriteLine("Warning: Enough arguments not specified");
+        Console.WriteLine("");
+        DEhelp.ShowCommands();
     }
+
 
     // Display Help page according to the argument
-    bool CheckIfArgIsHelp = args[0].Contains("-?") || args[0].Contains("-h");
-    switch (CheckIfArgIsHelp)
+    if (args[0].Contains("-?") || args[0].Contains("-h"))
     {
-        case true:
-            DEhelp.ShowCommands();
-            break;
+        DEhelp.ShowCommands();
+    }
+    
 
-        case false:
-            break;
+    // Check the default argument length for tool actions
+    if (args.Length < 2)
+    {
+        Console.WriteLine("Warning: Enough arguments not specified");
+        Console.WriteLine("");
+        DEhelp.ShowCommands();
     }
 
 
-    // Check the default argument length
-    bool CheckArgsLength = args.Length < 2;
-    switch (CheckArgsLength)
-    {
-        case true:
-            Console.WriteLine("Warning: Enough arguments not specified");
-            Console.WriteLine("");
-            DEhelp.ShowCommands();
-            break;
-        case false:
-            break;
-    }
-
-    var ToolAction = args[0];
-    var InFileOrFolder = args[1];
+    var toolAction = args[0];
+    var inFileOrFolder = args[1];
 
 
     // Check if compression level is specified if tool 
     // is set to use the pack function
-    var CompLvl = "";
-    bool CheckIfSetToPack = ToolAction.Contains("-p");
-    switch (CheckIfSetToPack)
+    var cmpLvl = "";
+    if (toolAction.Contains("-p"))
     {
-        case true:
-            bool CheckArgCount = args.Length > 2;
+        if (args.Length < 3)
+        {
+            DEcmn.ErrorExit("Error: Compression level is not specified");
+        }
 
-            switch (CheckArgCount)
-            {
-                case true:
-                    break;
+        cmpLvl = args[2];
+        string[] validCmpLvls = { "-c0", "-c1", "-c2", "-c3" };
 
-                case false:
-                    DEcmn.ErrorExit("Error: Compression level is not specified");
-                    break;
-            }
-
-            CompLvl = args[2];
-
-            string[] ValidCompLvls = { "-c0", "-c1", "-c2", "-c3" };
-
-            bool CheckIfCompLvlIsValid = ValidCompLvls.Contains(CompLvl);
-            switch (CheckIfCompLvlIsValid)
-            {
-                case true:
-                    break;
-
-                case false:
-                    Console.WriteLine("Error: Valid Compression level is not specified");
-                    Console.WriteLine("");
-                    DEhelp.ShowCommands();
-                    break;
-            }
-            break;
-
-        case false:
-            break;
+        if (!validCmpLvls.Contains(cmpLvl))
+        {
+            Console.WriteLine("Error: Valid Compression level is not specified");
+            Console.WriteLine("");
+            DEhelp.ShowCommands();
+        }
     }
 
 
-    // Check if Specific file is specified if tool 
+    // Check if specific file path is specified if tool 
     // is set to use the unpack single file function
-    var SpecificFilePath = "";
-    bool CheckIfSetToUnpkOneFile = ToolAction.Contains("-uf");
-    switch (CheckIfSetToUnpkOneFile)
+    var specificFilePath = "";
+    if (toolAction.Contains("-uf"))
     {
-        case true:
-            bool CheckArgCount = args.Length > 2;
+        if (args.Length < 3)
+        {
+            DEcmn.ErrorExit("Error: Specific file path is not specified");
+        }
 
-            switch (CheckArgCount)
-            {
-                case true:
-                    break;
-
-                case false:
-                    DEcmn.ErrorExit("Error: Compression level is not specified");
-                    break;
-            }
-
-            SpecificFilePath = args[2];
-            break;
-
-        case false:
-            break;
+        specificFilePath = args[2];
     }
 
 
     // According to the specified tool action,
     // do the respective action
-    bool InFolderDirExists = false;
-    bool InFileExists = false;
+    bool inFolderDirExists = false;
+    bool inFileExists = false;
 
-    switch (ToolAction)
+    switch (toolAction)
     {
         case "-p":
-            InFolderDirExists = Directory.Exists(InFileOrFolder);
-            switch (InFolderDirExists)
+            inFolderDirExists = Directory.Exists(inFileOrFolder);
+            switch (inFolderDirExists)
             {
                 case true:
-                    DEpack.PackFolder(InFileOrFolder, CompLvl);
+                    DEpack.PackFolder(inFileOrFolder, cmpLvl);
                     break;
 
                 case false:
@@ -137,11 +90,11 @@ try
             break;
 
         case "-u":
-            InFileExists = File.Exists(InFileOrFolder);
-            switch (InFileExists)
+            inFileExists = File.Exists(inFileOrFolder);
+            switch (inFileExists)
             {
                 case true:
-                    DEunpack.UnpackFiles(InFileOrFolder);
+                    DEunpack.UnpackFiles(inFileOrFolder);
                     break;
 
                 case false:
@@ -151,11 +104,11 @@ try
             break;
 
         case "-uf":
-            InFileExists = File.Exists(InFileOrFolder);
-            switch (InFileExists)
+            inFileExists = File.Exists(inFileOrFolder);
+            switch (inFileExists)
             {
                 case true:
-                    DEunpack.UnpackSingleFile(InFileOrFolder, SpecificFilePath);
+                    DEunpack.UnpackSingleFile(inFileOrFolder, specificFilePath);
                     break;
 
                 case false:
@@ -165,11 +118,11 @@ try
             break;
 
         case "-up":
-            InFileExists = File.Exists(InFileOrFolder);
-            switch (InFileExists)
+            inFileExists = File.Exists(inFileOrFolder);
+            switch (inFileExists)
             {
                 case true:
-                    DEunpack.UnpackFilePaths(InFileOrFolder);
+                    DEunpack.UnpackFilePaths(inFileOrFolder);
                     break;
 
                 case false:

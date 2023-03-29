@@ -1,8 +1,7 @@
 {
   "profiles": {
     "DeviPackUnpackTool": {
-      "commandName": "Project",
-      "commandLineArgs": "-?"
+      "commandName": "Project"
     }
   }
 }
