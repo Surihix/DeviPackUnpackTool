@@ -193,7 +193,7 @@ internal class DEunpack
         }
 
         Console.WriteLine("");
-        Console.WriteLine("Finished unpacking files");
+        Console.WriteLine("Finished unpacking file");
     }
 
 

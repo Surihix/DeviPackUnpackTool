@@ -1,7 +1,8 @@
 {
   "profiles": {
     "DeviPackUnpackTool": {
-      "commandName": "Project"
+      "commandName": "Project",
+      "commandLineArgs": "-uf \"z000_us.devi\" \"LMV_us_track-1.wav\""
     }
   }
 }
