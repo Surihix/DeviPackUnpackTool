@@ -29,6 +29,9 @@ Usage examples:
 Optionally, you can also run the app from a command prompt with the ``-?`` or ``-h`` argument switches to display the valid arguments that you can use 
 with this app.
 
+There is also a framework version of this app which you can get from this link below:
+
+
 # For Developers
 Refer to the [Format Structure](https://github.com/Surihix/DeviPackUnpackTool/blob/master/FormatStruct.md) page to learn more about the structure of the 
 archive file made with this app.
